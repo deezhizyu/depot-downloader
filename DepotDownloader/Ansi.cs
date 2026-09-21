@@ -26,7 +26,7 @@ static class Ansi
 
     public static void Init()
     {
-        if (Console.IsInputRedirected || Console.IsOutputRedirected)
+        if (JsonOutput.Enabled || Console.IsInputRedirected || Console.IsOutputRedirected)
         {
             return;
         }

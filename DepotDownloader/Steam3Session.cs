@@ -265,6 +265,7 @@ namespace DepotDownloader
             if (requestCode == 0)
             {
                 Console.WriteLine($"No manifest request code was returned for depot {depotId} from app {appId}, manifest {manifestId}");
+                JsonOutput.Fail("no_manifest_access", $"No manifest request code was returned for depot {depotId} from app {appId}, manifest {manifestId}");
 
                 if (!authenticatedUser)
                 {
@@ -463,6 +464,7 @@ namespace DepotDownloader
                         catch (Exception ex)
                         {
                             Console.Error.WriteLine("Failed to authenticate with Steam: " + ex.Message);
+                            FailAuthentication(ex);
                             Abort(false);
                             return;
                         }
@@ -484,8 +486,11 @@ namespace DepotDownloader
                             // Steam will periodically refresh the challenge url, so we need a new QR code.
                             session.ChallengeURLChanged = () =>
                             {
-                                Console.WriteLine();
-                                Console.WriteLine("The QR code has changed:");
+                                if (!JsonOutput.Enabled)
+                                {
+                                    Console.WriteLine();
+                                    Console.WriteLine("The QR code has changed:");
+                                }
 
                                 DisplayQrCode(session.ChallengeURL);
                             };
@@ -500,6 +505,7 @@ namespace DepotDownloader
                         catch (Exception ex)
                         {
                             Console.Error.WriteLine("Failed to authenticate with Steam: " + ex.Message);
+                            FailAuthentication(ex);
                             Abort(false);
                             return;
                         }
@@ -540,6 +546,7 @@ namespace DepotDownloader
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine("Failed to authenticate with Steam: " + ex.Message);
+                        FailAuthentication(ex);
                         Abort(false);
                         return;
                     }
@@ -568,6 +575,7 @@ namespace DepotDownloader
             else if (connectionBackoff >= 10)
             {
                 Console.WriteLine("Could not connect to Steam after 10 tries");
+                JsonOutput.Fail("network_timeout", "Could not connect to Steam after 10 tries");
                 Abort(false);
             }
             else if (!bAborted)
@@ -617,6 +625,7 @@ namespace DepotDownloader
                     do
                     {
                         Console.Write("Please enter your 2 factor auth code from your authenticator app: ");
+                        JsonOutput.AuthPrompt("steam_guard_code", "Enter your 2 factor auth code from your authenticator app");
                         logonDetails.TwoFactorCode = Console.ReadLine();
                     } while (string.Empty == logonDetails.TwoFactorCode);
                 }
@@ -627,6 +636,7 @@ namespace DepotDownloader
 
                     // TODO: Handle gracefully by falling back to password prompt?
                     Console.WriteLine($"Access token was rejected ({loggedOn.Result}).");
+                    JsonOutput.Fail(JsonOutput.CodeForResult(loggedOn.Result), $"Access token was rejected ({loggedOn.Result})");
                     Abort(false);
                     return;
                 }
@@ -635,6 +645,7 @@ namespace DepotDownloader
                     do
                     {
                         Console.Write("Please enter the authentication code sent to your email address: ");
+                        JsonOutput.AuthPrompt("email_code", "Enter the authentication code sent to your email address");
                         logonDetails.AuthCode = Console.ReadLine();
                     } while (string.Empty == logonDetails.AuthCode);
                 }
@@ -657,6 +668,7 @@ namespace DepotDownloader
             if (loggedOn.Result == EResult.ServiceUnavailable)
             {
                 Console.WriteLine("Unable to login to Steam3: {0}", loggedOn.Result);
+                JsonOutput.Fail(JsonOutput.CodeForResult(loggedOn.Result), $"Unable to login to Steam3: {loggedOn.Result}");
                 Abort(false);
 
                 return;
@@ -665,12 +677,14 @@ namespace DepotDownloader
             if (loggedOn.Result != EResult.OK)
             {
                 Console.WriteLine("Unable to login to Steam3: {0}", loggedOn.Result);
+                JsonOutput.Fail(JsonOutput.CodeForResult(loggedOn.Result), $"Unable to login to Steam3: {loggedOn.Result}");
                 Abort();
 
                 return;
             }
 
             Console.WriteLine(" Done!");
+            JsonOutput.LoginSuccess(logonDetails.Username);
 
             this.seq++;
             IsLoggedOn = true;
@@ -704,8 +718,20 @@ namespace DepotDownloader
             }
         }
 
+        private static void FailAuthentication(Exception ex)
+        {
+            var result = ex is AuthenticationException authEx ? authEx.Result : EResult.Fail;
+            JsonOutput.Fail(JsonOutput.CodeForResult(result), "Failed to authenticate with Steam: " + ex.Message);
+        }
+
         private static void DisplayQrCode(string challengeUrl)
         {
+            if (JsonOutput.Enabled)
+            {
+                JsonOutput.Qr(challengeUrl);
+                return;
+            }
+
             // Encode the link as a QR code
             using var qrGenerator = new QRCodeGenerator();
             var qrCodeData = qrGenerator.CreateQrCode(challengeUrl, QRCodeGenerator.ECCLevel.L);

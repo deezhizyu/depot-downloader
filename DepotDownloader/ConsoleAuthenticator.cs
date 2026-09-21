@@ -23,6 +23,7 @@ namespace DepotDownloader
             do
             {
                 Console.Error.Write("STEAM GUARD! Please enter your 2-factor auth code from your authenticator app: ");
+                JsonOutput.AuthPrompt("steam_guard_code", "Enter your 2-factor auth code from your authenticator app");
                 code = Console.ReadLine()?.Trim();
 
                 if (code == null)
@@ -48,6 +49,7 @@ namespace DepotDownloader
             do
             {
                 Console.Error.Write($"STEAM GUARD! Please enter the auth code sent to the email at {email}: ");
+                JsonOutput.AuthPrompt("email_code", $"Enter the auth code sent to the email at {email}");
                 code = Console.ReadLine()?.Trim();
 
                 if (code == null)
@@ -69,6 +71,7 @@ namespace DepotDownloader
             }
 
             Console.Error.WriteLine("STEAM GUARD! Use the Steam Mobile App to confirm your sign in...");
+            JsonOutput.AuthPrompt("device_confirmation", "Use the Steam Mobile App to confirm your sign in");
 
             return Task.FromResult(true);
         }

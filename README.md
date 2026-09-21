@@ -1,6 +1,8 @@
 DepotDownloader
 ===============
 
+> **Fork notice:** this is a modified fork of [SteamRE/DepotDownloader](https://github.com/SteamRE/DepotDownloader), not the official SteamRE build. It adds a `-json` machine-readable output mode ([docs](docs/json-mode.md)). See [CHANGES.md](CHANGES.md). Licensed under GPL-2.0.
+
 Steam depot downloader utilizing the SteamKit2 library. Supports .NET 8.0
 
 This program must be run from a console, it has no GUI.

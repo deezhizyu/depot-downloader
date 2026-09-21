@@ -479,8 +479,14 @@ namespace DepotDownloader
                 else
                 {
                     var contentName = GetAppName(appId);
+                    JsonOutput.Fail("no_license", string.Format("App {0} ({1}) is not available from this account.", appId, contentName));
                     throw new ContentDownloaderException(string.Format("App {0} ({1}) is not available from this account.", appId, contentName));
                 }
+            }
+
+            if (JsonOutput.Enabled)
+            {
+                JsonOutput.AppInfo(appId, GetAppName(appId), GetSteam3AppSection(appId, EAppInfoSection.Config)?["installdir"].AsString());
             }
 
             var hasSpecificDepots = depotManifestIds.Count > 0;
@@ -739,6 +745,23 @@ namespace DepotDownloader
                 }
             }
 
+            if (JsonOutput.Enabled)
+            {
+                // All manifests are resolved and de-duplicated here, so totals are final before any download.
+                JsonOutput.Plan(depotsToDownload.Select(d =>
+                {
+                    var planFiles = d.filteredFiles.Where(f => !f.Flags.HasFlag(EDepotFileFlag.Directory)).ToList();
+                    return new PlanDepot(
+                        d.depotDownloadInfo.DepotId,
+                        d.depotDownloadInfo.ManifestId,
+                        d.depotDownloadInfo.Branch,
+                        planFiles.Count,
+                        planFiles.Sum(f => f.Chunks.Sum(c => (long)c.CompressedLength)),
+                        planFiles.Sum(f => (long)f.TotalSize));
+                }).ToList());
+                JsonOutput.StartProgress();
+            }
+
             foreach (var depotFileData in depotsToDownload)
             {
                 await DownloadSteam3AsyncDepotFiles(cts, downloadCounter, depotFileData, allFileNamesAllDepots);
@@ -869,12 +892,14 @@ namespace DepotDownloader
                             if (e.StatusCode == HttpStatusCode.Unauthorized || e.StatusCode == HttpStatusCode.Forbidden)
                             {
                                 Console.WriteLine("Encountered {2} for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId, (int)e.StatusCode);
+                                JsonOutput.Fail("no_manifest_access", $"Encountered {(int)e.StatusCode} for depot manifest {depot.DepotId} {depot.ManifestId}");
                                 break;
                             }
 
                             if (e.StatusCode == HttpStatusCode.NotFound)
                             {
                                 Console.WriteLine("Encountered 404 for depot manifest {0} {1}. Aborting.", depot.DepotId, depot.ManifestId);
+                                JsonOutput.Fail("no_manifest_access", $"Encountered 404 for depot manifest {depot.DepotId} {depot.ManifestId}");
                                 break;
                             }
 
@@ -894,6 +919,7 @@ namespace DepotDownloader
                     if (newManifest == null)
                     {
                         Console.WriteLine("\nUnable to download manifest {0} for depot {1}", depot.ManifestId, depot.DepotId);
+                        JsonOutput.Fail("no_manifest_access", $"Unable to download manifest {depot.ManifestId} for depot {depot.DepotId}");
                         cts.Cancel();
                     }
 
@@ -960,6 +986,7 @@ namespace DepotDownloader
             var depotCounter = depotFilesData.depotCounter;
 
             Console.WriteLine("Downloading depot {0}", depot.DepotId);
+            JsonOutput.DepotStart(depot.DepotId);
 
             var files = depotFilesData.filteredFiles.Where(f => !f.Flags.HasFlag(EDepotFileFlag.Directory)).ToArray();
             var networkChunkQueue = new ConcurrentQueue<(FileStreamData fileStreamData, DepotManifest.FileData fileData, DepotManifest.ChunkData chunk)>();
@@ -1017,6 +1044,7 @@ namespace DepotDownloader
             DepotConfigStore.Save();
 
             Console.WriteLine("Depot {0} - Downloaded {1} bytes ({2} bytes uncompressed)", depot.DepotId, depotCounter.depotBytesCompressed, depotCounter.depotBytesUncompressed);
+            JsonOutput.DepotDone(depot.DepotId, depotCounter.depotBytesCompressed, depotCounter.depotBytesUncompressed);
         }
 
         private static void DownloadSteam3AsyncDepotFile(
@@ -1066,6 +1094,11 @@ namespace DepotDownloader
                 }
 
                 neededChunks = new List<DepotManifest.ChunkData>(file.Chunks);
+
+                if (neededChunks.Count == 0)
+                {
+                    DownloadCounters.AddFileDone();
+                }
             }
             else
             {
@@ -1175,10 +1208,17 @@ namespace DepotDownloader
 
                 if (neededChunks.Count == 0)
                 {
+                    DownloadCounters.AddVerified((long)file.TotalSize);
+                    DownloadCounters.AddFileDone();
+
                     lock (depotDownloadCounter)
                     {
                         depotDownloadCounter.sizeDownloaded += file.TotalSize;
-                        Console.WriteLine("{0,6:#00.00}% {1}", (depotDownloadCounter.sizeDownloaded / (float)depotDownloadCounter.completeDownloadSize) * 100.0f, fileFinalPath);
+
+                        if (!JsonOutput.Enabled)
+                        {
+                            Console.WriteLine("{0,6:#00.00}% {1}", (depotDownloadCounter.sizeDownloaded / (float)depotDownloadCounter.completeDownloadSize) * 100.0f, fileFinalPath);
+                        }
                     }
 
                     lock (downloadCounter)
@@ -1190,6 +1230,7 @@ namespace DepotDownloader
                 }
 
                 var sizeOnDisk = (file.TotalSize - (ulong)neededChunks.Select(x => (long)x.UncompressedLength).Sum());
+                DownloadCounters.AddVerified((long)sizeOnDisk);
                 lock (depotDownloadCounter)
                 {
                     depotDownloadCounter.sizeDownloaded += sizeOnDisk;
@@ -1299,6 +1340,7 @@ namespace DepotDownloader
                         if (e.StatusCode == HttpStatusCode.Unauthorized || e.StatusCode == HttpStatusCode.Forbidden)
                         {
                             Console.WriteLine("Encountered {1} for chunk {0}. Aborting.", chunkID, (int)e.StatusCode);
+                            JsonOutput.Fail("no_manifest_access", $"Encountered {(int)e.StatusCode} for chunk {chunkID}");
                             break;
                         }
 
@@ -1314,6 +1356,11 @@ namespace DepotDownloader
                         Console.WriteLine("Encountered unexpected error downloading chunk {0}: {1}", chunkID, e.Message);
                     }
                 } while (written == 0);
+
+                if (written > 0)
+                {
+                    DownloadCounters.AddNetwork(chunk.CompressedLength);
+                }
 
                 if (written == 0)
                 {
@@ -1336,6 +1383,7 @@ namespace DepotDownloader
 
                     fileStreamData.fileStream.Seek((long)chunk.Offset, SeekOrigin.Begin);
                     await fileStreamData.fileStream.WriteAsync(chunkBuffer.AsMemory(0, written), cts.Token);
+                    DownloadCounters.AddWritten(written);
                 }
                 finally
                 {
@@ -1373,8 +1421,13 @@ namespace DepotDownloader
 
             if (remainingChunks == 0)
             {
-                var fileFinalPath = Path.Combine(depot.InstallDir, file.FileName);
-                Console.WriteLine("{0,6:#00.00}% {1}", (sizeDownloaded / (float)depotDownloadCounter.completeDownloadSize) * 100.0f, fileFinalPath);
+                DownloadCounters.AddFileDone();
+
+                if (!JsonOutput.Enabled)
+                {
+                    var fileFinalPath = Path.Combine(depot.InstallDir, file.FileName);
+                    Console.WriteLine("{0,6:#00.00}% {1}", (sizeDownloaded / (float)depotDownloadCounter.completeDownloadSize) * 100.0f, fileFinalPath);
+                }
             }
         }
 

@@ -1,0 +1,87 @@
+name: Release
+
+# Fork release workflow: on tag push, build self-contained single-file binaries and publish them as a
+# GitHub Release. Asset names match upstream (DepotDownloader-{os}-{arch}.zip) so
+# releases/latest/download/<name> URLs keep working.
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: windows-x64,   rid: win-x64,     runs-on: windows-latest }
+          - { name: windows-arm64, rid: win-arm64,   runs-on: windows-latest }
+          - { name: linux-x64,     rid: linux-x64,   runs-on: ubuntu-latest }
+          - { name: linux-arm,     rid: linux-arm,   runs-on: ubuntu-latest }
+          - { name: linux-arm64,   rid: linux-arm64, runs-on: ubuntu-latest }
+          - { name: macos-x64,     rid: osx-x64,     runs-on: macos-latest }
+          - { name: macos-arm64,   rid: osx-arm64,   runs-on: macos-latest }
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v6
+
+      - name: Publish
+        run: dotnet publish DepotDownloader/DepotDownloader.csproj --configuration Release -p:ContinuousIntegrationBuild=true -p:PublishSingleFile=true -p:DebugType=embedded --self-contained --runtime ${{ matrix.rid }} --output publish
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: DepotDownloader-${{ matrix.name }}
+          path: publish
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Create release files
+        run: |
+          set -eux
+          mkdir release
+          for name in windows-x64 windows-arm64 linux-x64 linux-arm linux-arm64 macos-x64 macos-arm64; do
+            if [[ "$name" != windows-* ]]; then chmod +x artifacts/DepotDownloader-$name/DepotDownloader; fi
+            # -j: executable and LICENSE at the zip root
+            zip -9j release/DepotDownloader-$name.zip artifacts/DepotDownloader-$name/*
+          done
+          ls -l release
+
+      - name: Write release notes
+        run: |
+          cat > notes.md <<NOTES
+          Modified fork of [SteamRE/DepotDownloader](https://github.com/SteamRE/DepotDownloader), **not** the official SteamRE build.
+          Adds a \`-json\` machine-readable output mode; see \`docs/json-mode.md\`.
+
+          Licensed under GPL-2.0 (see the LICENSE file included in every zip).
+          Corresponding source for these binaries: https://github.com/${{ github.repository }}/tree/${{ github.sha }}
+          (tag archive: https://github.com/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.zip)
+          NOTES
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: notes.md
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

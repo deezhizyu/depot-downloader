@@ -21,6 +21,41 @@ namespace DepotDownloader
 
         static async Task<int> Main(string[] args)
         {
+            // Fork addition: -json switches stdout to JSON Lines. Detected before anything is printed.
+            if (!args.Any(a => a.Equals("-json", StringComparison.OrdinalIgnoreCase)))
+            {
+                return await MainCore(args).ConfigureAwait(false);
+            }
+
+            JsonOutput.Enable();
+
+            int exitCode;
+            try
+            {
+                exitCode = await MainCore(args).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                JsonOutput.EmitFatal(ex.Message);
+                throw;
+            }
+
+            JsonOutput.StopProgress();
+
+            if (exitCode == 0)
+            {
+                JsonOutput.Done();
+            }
+            else
+            {
+                JsonOutput.EmitFatal("Download failed");
+            }
+
+            return exitCode;
+        }
+
+        static async Task<int> MainCore(string[] args)
+        {
             if (args.Length == 0)
             {
                 PrintVersion();
@@ -51,6 +86,8 @@ namespace DepotDownloader
 
             consumedArgs = new bool[args.Length];
 
+            HasParameter(args, "-json");
+
             if (HasParameter(args, "-debug"))
             {
                 PrintVersion(true);
@@ -58,10 +95,19 @@ namespace DepotDownloader
                 DebugLog.Enabled = true;
                 DebugLog.AddListener((category, message) =>
                 {
+                    if (JsonOutput.Enabled)
+                    {
+                        JsonOutput.Log("debug", $"[{category}] {message}");
+                        return;
+                    }
+
                     Console.WriteLine("[{0}] {1}", category, message);
                 });
 
-                var httpEventListener = new HttpDiagnosticEventListener();
+                if (!JsonOutput.Enabled)
+                {
+                    var httpEventListener = new HttpDiagnosticEventListener();
+                }
             }
 
             var username = GetParameter<string>(args, "-username") ?? GetParameter<string>(args, "-user");
@@ -185,6 +231,7 @@ namespace DepotDownloader
                         || ex is OperationCanceledException)
                     {
                         Console.WriteLine(ex.Message);
+                        JsonOutput.Fail("unknown", ex.Message);
                         return 1;
                     }
                     catch (Exception e)
@@ -222,6 +269,7 @@ namespace DepotDownloader
                         || ex is OperationCanceledException)
                     {
                         Console.WriteLine(ex.Message);
+                        JsonOutput.Fail("unknown", ex.Message);
                         return 1;
                     }
                     catch (Exception e)
@@ -320,6 +368,7 @@ namespace DepotDownloader
                         || ex is OperationCanceledException)
                     {
                         Console.WriteLine(ex.Message);
+                        JsonOutput.Fail("unknown", ex.Message);
                         return 1;
                     }
                     catch (Exception e)
@@ -358,7 +407,8 @@ namespace DepotDownloader
                     do
                     {
                         Console.Write("Enter account password for \"{0}\": ", username);
-                        if (Console.IsInputRedirected)
+                        JsonOutput.AuthPrompt("password", $"Enter account password for \"{username}\"");
+                        if (Console.IsInputRedirected || JsonOutput.Enabled)
                         {
                             password = Console.ReadLine();
                         }
@@ -531,6 +581,7 @@ namespace DepotDownloader
             Console.WriteLine("  -use-lancache            - forces downloads over the local network via a Lancache instance.");
             Console.WriteLine();
             Console.WriteLine("  -debug                   - enable verbose debug logging.");
+            Console.WriteLine("  -json                    - write machine-readable JSON Lines to stdout (see docs/json-mode.md).");
             Console.WriteLine("  -V or --version          - print version and runtime.");
         }
 
