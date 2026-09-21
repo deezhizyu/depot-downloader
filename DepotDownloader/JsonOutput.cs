@@ -231,6 +231,16 @@ namespace DepotDownloader
                     w.WriteNumber("written_bytes", wr);
                     w.WriteNumber("verified_bytes", v);
                     w.WriteNumber("files_done", f);
+
+                    var current = DownloadCounters.CurrentFile;
+                    if (current == null)
+                    {
+                        w.WriteNull("current_file");
+                    }
+                    else
+                    {
+                        w.WriteString("current_file", current);
+                    }
                 });
             }
         }

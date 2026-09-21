@@ -1283,6 +1283,8 @@ namespace DepotDownloader
             var written = 0;
             var chunkBuffer = ArrayPool<byte>.Shared.Rent((int)chunk.UncompressedLength);
 
+            DownloadCounters.BeginFile(file.FileName);
+
             try
             {
                 do
@@ -1392,6 +1394,7 @@ namespace DepotDownloader
             }
             finally
             {
+                DownloadCounters.EndFile(file.FileName);
                 ArrayPool<byte>.Shared.Return(chunkBuffer);
             }
 
