@@ -307,6 +307,15 @@ namespace DepotDownloader
             return info["name"].AsString();
         }
 
+        static string GetAppType(uint appId)
+        {
+            var info = GetSteam3AppSection(appId, EAppInfoSection.Common);
+            if (info == null)
+                return string.Empty;
+
+            return info["type"].AsString();
+        }
+
         public static bool InitializeSteam3(string username, string password)
         {
             string loginToken = null;
@@ -420,20 +429,20 @@ namespace DepotDownloader
             }
         }
 
-        public static async Task ListUserAppsAsync()
+        public static async Task ListUserAppsAsync(string appTypeFilter = null)
         {
             IEnumerable<uint> licenseQuery;
             if (steam3.steamUser.SteamID.AccountType == EAccountType.AnonUser)
             {
                 licenseQuery = [17906];
             }
-            else if (steam3.Licenses == null)
-            {
-                licenseQuery = [];
-            }
             else
             {
-                licenseQuery = steam3.Licenses.Select(x => x.PackageID).Distinct();
+                // LicenseListCallback arrives as its own message after LoggedOn, so it
+                // may not have been processed yet at this point - wait for it rather
+                // than treating a still-null Licenses as "no licenses".
+                steam3.WaitUntilCallback(() => { }, () => steam3.Licenses != null);
+                licenseQuery = steam3.Licenses?.Select(x => x.PackageID).Distinct() ?? [];
             }
 
             await steam3.RequestPackageInfo(licenseQuery);
@@ -452,7 +461,11 @@ namespace DepotDownloader
 
             await steam3.RequestAppInfo(appIds);
 
-            var apps = appIds.Select(appId => (AppId: appId, Name: GetAppName(appId) is { Length: > 0 } name ? name : "Unknown"))
+            var apps = appIds.Select(appId => (
+                    AppId: appId,
+                    Name: GetAppName(appId) is { Length: > 0 } name ? name : "Unknown",
+                    Type: GetAppType(appId) is { Length: > 0 } type ? type : "Unknown"))
+                .Where(app => appTypeFilter == null || string.Equals(app.Type, appTypeFilter, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -465,7 +478,7 @@ namespace DepotDownloader
                 Console.WriteLine("Found {0} app(s) available for download:", apps.Count);
                 foreach (var app in apps)
                 {
-                    Console.WriteLine(" {0,10} - {1}", app.AppId, app.Name);
+                    Console.WriteLine(" {0,10} - {1,-10} - {2}", app.AppId, app.Type, app.Name);
                 }
             }
         }

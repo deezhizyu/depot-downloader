@@ -209,13 +209,15 @@ namespace DepotDownloader
             {
                 #region List user apps
 
+                var appTypeFilter = GetParameter<string>(args, "-app-type");
+
                 PrintUnconsumedArgs(args);
 
                 if (InitializeSteam(username, password))
                 {
                     try
                     {
-                        await ContentDownloader.ListUserAppsAsync().ConfigureAwait(false);
+                        await ContentDownloader.ListUserAppsAsync(appTypeFilter).ConfigureAwait(false);
                     }
                     catch (Exception ex) when (
                         ex is ContentDownloaderException
@@ -618,7 +620,7 @@ namespace DepotDownloader
             Console.WriteLine("       depotdownloader -app <id> -ugc <id> [-username <username> [-password <password>]]");
             Console.WriteLine();
             Console.WriteLine("Usage: listing apps available for download on an account");
-            Console.WriteLine("       depotdownloader -list-user-apps [-username <username> [-password <password>]]");
+            Console.WriteLine("       depotdownloader -list-user-apps [-app-type <type>] [-username <username> [-password <password>]]");
             Console.WriteLine("Usage: listing branches for an app");
             Console.WriteLine("       depotdownloader -app <id> -list-branches [-username <username> [-password <password>]]");
             Console.WriteLine();
@@ -641,6 +643,7 @@ namespace DepotDownloader
             Console.WriteLine("  -pubfile <#>             - the PublishedFileId to download. (Will automatically resolve to UGC id)");
             Console.WriteLine();
             Console.WriteLine("  -list-user-apps          - print the apps available for download on the logged-in account, then exit.");
+            Console.WriteLine("  -app-type <type>         - with -list-user-apps, only list apps of this type (Game, DLC, Tool, Demo, Application, ...).");
             Console.WriteLine();
             Console.WriteLine("  -username <user>         - the username of the account to login to for restricted content.");
             Console.WriteLine("  -password <pass>         - the password of the account to login to for restricted content.");

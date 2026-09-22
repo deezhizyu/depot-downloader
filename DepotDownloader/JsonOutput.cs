@@ -142,7 +142,7 @@ namespace DepotDownloader
             w.WriteString("install_dir", installDir);
         });
 
-        public static void UserApps(IReadOnlyList<(uint AppId, string Name)> apps) => Emit("user_apps", w =>
+        public static void UserApps(IReadOnlyList<(uint AppId, string Name, string Type)> apps) => Emit("user_apps", w =>
         {
             w.WriteStartArray("apps");
             foreach (var app in apps)
@@ -150,6 +150,7 @@ namespace DepotDownloader
                 w.WriteStartObject();
                 w.WriteNumber("app_id", app.AppId);
                 w.WriteString("name", app.Name);
+                w.WriteString("type", app.Type);
                 w.WriteEndObject();
             }
             w.WriteEndArray();

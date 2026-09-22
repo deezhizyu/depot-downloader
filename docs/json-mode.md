@@ -29,7 +29,7 @@ Field names are snake_case. Integers are JSON numbers (int64).
 | `qr` | `url` | `-qr` login: raw challenge URL, on creation and on every refresh |
 | `login_success` | `username` (string, `null` for anonymous) | authentication succeeded |
 | `app_info` | `app_id`, `name`, `install_dir` | app info available (`install_dir` = app `installdir`) |
-| `user_apps` | `apps`: [`app_id`, `name`], `count` | `-list-user-apps`: once, with every app the account's licenses grant |
+| `user_apps` | `apps`: [`app_id`, `name`, `type`], `count` | `-list-user-apps`: once, with every app the account's licenses grant (filtered by `-app-type` if given) |
 | `branches` | `app_id`, `branches`: [`name`, `build_id`, `time_updated`, `password_required`] | `-list-branches`: once, with every branch of the requested app |
 | `plan` | `depots`: [`depot_id`, `manifest_id`, `branch`, `files`, `compressed_bytes`, `uncompressed_bytes`], `total_compressed_bytes`, `total_uncompressed_bytes`, `total_files` | once, after all manifests are resolved and de-duplicated, before any file is touched. Files exclude directories. With `-manifest-only` `depots` is empty |
 | `depot_start` | `depot_id` | depot download begins |

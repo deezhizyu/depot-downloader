@@ -10,10 +10,11 @@ This is a modified fork of [SteamRE/DepotDownloader](https://github.com/SteamRE/
   `--help` lists the new flag.
 * Added `.github/workflows/release.yml` (tag-triggered release builds); the draft `release` job in
   `build.yml` and the winget submission workflow are disabled on this fork.
-* Added the `-list-user-apps` flag: prints the AppIDs and names available on the logged-in
-  account's licenses, then exits without downloading (`ContentDownloader.ListUserAppsAsync`,
-  hook in `Program.cs`; emits a `user_apps` event in `-json` mode, see
-  [docs/json-mode.md](docs/json-mode.md)).
+* Added the `-list-user-apps` flag: prints the AppIDs, types, and names available on the
+  logged-in account's licenses, then exits without downloading (`ContentDownloader.
+  ListUserAppsAsync`, hook in `Program.cs`; emits a `user_apps` event in `-json` mode, see
+  [docs/json-mode.md](docs/json-mode.md)). `-app-type <type>` filters the list to one app type
+  (`Game`, `DLC`, `Tool`, `Demo`, `Application`, ...).
 * Added the `-list-branches` flag: prints every branch (build id, last-updated time, password
   requirement) for the app given by `-app`, then exits without downloading
   (`ContentDownloader.ListBranchesAsync`, hook in `Program.cs`; emits a `branches` event in
