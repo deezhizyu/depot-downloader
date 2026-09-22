@@ -69,6 +69,16 @@ For example: `./DepotDownloader -app 730 -ugc 770604181014286929`
 Prints the AppIDs and names of every app the account's licenses grant, then exits without
 downloading anything.
 
+### Listing branches for an app
+```powershell
+./DepotDownloader -app <id> -list-branches [-username <username> [-password <password>]]
+```
+
+For example: `./DepotDownloader -app 730 -list-branches`
+
+Prints every branch name for the app, along with its build id, last-updated time, and whether it
+needs a `-branchpassword`, then exits without downloading anything.
+
 ## Parameters
 
 #### Authentication
@@ -94,6 +104,7 @@ Parameter                | Description
 `-branch <branchname>`   | download from specified branch if available (default: Public).
 `-branchpassword <pass>` | branch password if applicable.
 `-list-user-apps`        | print the apps available for download on the logged-in account, then exit.
+`-list-branches`         | print the branches available for `-app`, then exit.
 
 #### Download configuration
 

@@ -470,6 +470,51 @@ namespace DepotDownloader
             }
         }
 
+        public static async Task ListBranchesAsync(uint appId)
+        {
+            await steam3?.RequestAppInfo(appId);
+
+            var depots = GetSteam3AppSection(appId, EAppInfoSection.Depots);
+            if (depots == null)
+            {
+                throw new ContentDownloaderException(string.Format("Couldn't find depot information for app {0}, either the account has no access, or the app id is incorrect.", appId));
+            }
+
+            var branchesSection = depots["branches"];
+            if (branchesSection == KeyValue.Invalid || branchesSection.Children.Count == 0)
+            {
+                throw new ContentDownloaderException(string.Format("App {0} has no branches.", appId));
+            }
+
+            var branches = branchesSection.Children
+                .Select(b => (
+                    Name: b.Name,
+                    BuildId: b["buildid"].AsUnsignedInteger(),
+                    TimeUpdated: b["timeupdated"].AsUnsignedLong(),
+                    PasswordRequired: b["pwdrequired"].AsBoolean()
+                ))
+                .OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (JsonOutput.Enabled)
+            {
+                JsonOutput.Branches(appId, branches);
+            }
+            else
+            {
+                Console.WriteLine("Found {0} branch(es) for app {1}:", branches.Count, appId);
+                foreach (var branch in branches)
+                {
+                    var updated = branch.TimeUpdated > 0
+                        ? DateTimeOffset.FromUnixTimeSeconds((long)branch.TimeUpdated).UtcDateTime.ToString("u")
+                        : "unknown";
+
+                    Console.WriteLine(" {0,-30} buildid {1,10}  updated {2}{3}",
+                        branch.Name, branch.BuildId, updated, branch.PasswordRequired ? "  [password required]" : "");
+                }
+            }
+        }
+
         private static async Task DownloadWebFile(uint appId, string fileName, string url)
         {
             if (!CreateDirectories(appId, 0, out var installDir))

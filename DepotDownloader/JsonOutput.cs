@@ -156,6 +156,22 @@ namespace DepotDownloader
             w.WriteNumber("count", apps.Count);
         });
 
+        public static void Branches(uint appId, IReadOnlyList<(string Name, uint BuildId, ulong TimeUpdated, bool PasswordRequired)> branches) => Emit("branches", w =>
+        {
+            w.WriteNumber("app_id", appId);
+            w.WriteStartArray("branches");
+            foreach (var branch in branches)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", branch.Name);
+                w.WriteNumber("build_id", branch.BuildId);
+                w.WriteNumber("time_updated", branch.TimeUpdated);
+                w.WriteBoolean("password_required", branch.PasswordRequired);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+        });
+
         public static void Plan(IReadOnlyList<PlanDepot> depots)
         {
             long compressed = 0, uncompressed = 0, files = 0;

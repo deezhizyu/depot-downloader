@@ -248,6 +248,42 @@ namespace DepotDownloader
                 return 1;
             }
 
+            if (HasParameter(args, "-list-branches"))
+            {
+                #region List branches
+
+                PrintUnconsumedArgs(args);
+
+                if (InitializeSteam(username, password))
+                {
+                    try
+                    {
+                        await ContentDownloader.ListBranchesAsync(appId).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (
+                        ex is ContentDownloaderException
+                        || ex is OperationCanceledException)
+                    {
+                        Console.WriteLine(ex.Message);
+                        JsonOutput.Fail("unknown", ex.Message);
+                        return 1;
+                    }
+                    finally
+                    {
+                        ContentDownloader.ShutdownSteam3();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Error: InitializeSteam failed");
+                    return 1;
+                }
+
+                #endregion
+
+                return 0;
+            }
+
             var pubFile = GetParameter(args, "-pubfile", ContentDownloader.INVALID_MANIFEST_ID);
             var ugcId = GetParameter(args, "-ugc", ContentDownloader.INVALID_MANIFEST_ID);
             if (pubFile != ContentDownloader.INVALID_MANIFEST_ID)
@@ -583,6 +619,8 @@ namespace DepotDownloader
             Console.WriteLine();
             Console.WriteLine("Usage: listing apps available for download on an account");
             Console.WriteLine("       depotdownloader -list-user-apps [-username <username> [-password <password>]]");
+            Console.WriteLine("Usage: listing branches for an app");
+            Console.WriteLine("       depotdownloader -app <id> -list-branches [-username <username> [-password <password>]]");
             Console.WriteLine();
             Console.WriteLine("Parameters:");
             Console.WriteLine("  -app <#>                 - the AppID to download.");
@@ -590,6 +628,7 @@ namespace DepotDownloader
             Console.WriteLine("  -manifest <id>           - manifest id of content to download (requires -depot, default: current for branch).");
             Console.WriteLine($"  -branch <branchname>    - download from specified branch if available (default: {ContentDownloader.DEFAULT_BRANCH}).");
             Console.WriteLine("  -branchpassword <pass>   - branch password if applicable.");
+            Console.WriteLine("  -list-branches           - print the branches available for -app, then exit.");
             Console.WriteLine("  -all-platforms           - downloads all platform-specific depots when -app is used.");
             Console.WriteLine("  -all-archs               - download all architecture-specific depots when -app is used.");
             Console.WriteLine("  -os <os>                 - the operating system for which to download the game (windows, macos or linux, default: OS the program is currently running on)");

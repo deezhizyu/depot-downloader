@@ -14,5 +14,9 @@ This is a modified fork of [SteamRE/DepotDownloader](https://github.com/SteamRE/
   account's licenses, then exits without downloading (`ContentDownloader.ListUserAppsAsync`,
   hook in `Program.cs`; emits a `user_apps` event in `-json` mode, see
   [docs/json-mode.md](docs/json-mode.md)).
+* Added the `-list-branches` flag: prints every branch (build id, last-updated time, password
+  requirement) for the app given by `-app`, then exits without downloading
+  (`ContentDownloader.ListBranchesAsync`, hook in `Program.cs`; emits a `branches` event in
+  `-json` mode, see [docs/json-mode.md](docs/json-mode.md)).
 
 Original copyright notices and the LICENSE file are unchanged.
