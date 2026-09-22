@@ -61,6 +61,14 @@ For example: `./DepotDownloader -app 730 -pubfile 1885082371`
 
 For example: `./DepotDownloader -app 730 -ugc 770604181014286929`
 
+### Listing apps available on an account
+```powershell
+./DepotDownloader -list-user-apps [-username <username> [-password <password>]]
+```
+
+Prints the AppIDs and names of every app the account's licenses grant, then exits without
+downloading anything.
+
 ## Parameters
 
 #### Authentication
@@ -85,6 +93,7 @@ Parameter                | Description
 `-pubfile <#>`           | the PublishedFileId to download. (Will automatically resolve to UGC id)
 `-branch <branchname>`   | download from specified branch if available (default: Public).
 `-branchpassword <pass>` | branch password if applicable.
+`-list-user-apps`        | print the apps available for download on the logged-in account, then exit.
 
 #### Download configuration
 

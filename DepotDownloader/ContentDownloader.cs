@@ -420,6 +420,56 @@ namespace DepotDownloader
             }
         }
 
+        public static async Task ListUserAppsAsync()
+        {
+            IEnumerable<uint> licenseQuery;
+            if (steam3.steamUser.SteamID.AccountType == EAccountType.AnonUser)
+            {
+                licenseQuery = [17906];
+            }
+            else if (steam3.Licenses == null)
+            {
+                licenseQuery = [];
+            }
+            else
+            {
+                licenseQuery = steam3.Licenses.Select(x => x.PackageID).Distinct();
+            }
+
+            await steam3.RequestPackageInfo(licenseQuery);
+
+            var appIds = new SortedSet<uint>();
+            foreach (var license in licenseQuery)
+            {
+                if (steam3.PackageInfo.TryGetValue(license, out var package) && package != null)
+                {
+                    foreach (var child in package.KeyValues["appids"].Children)
+                    {
+                        appIds.Add(child.AsUnsignedInteger());
+                    }
+                }
+            }
+
+            await steam3.RequestAppInfo(appIds);
+
+            var apps = appIds.Select(appId => (AppId: appId, Name: GetAppName(appId) is { Length: > 0 } name ? name : "Unknown"))
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (JsonOutput.Enabled)
+            {
+                JsonOutput.UserApps(apps);
+            }
+            else
+            {
+                Console.WriteLine("Found {0} app(s) available for download:", apps.Count);
+                foreach (var app in apps)
+                {
+                    Console.WriteLine(" {0,10} - {1}", app.AppId, app.Name);
+                }
+            }
+        }
+
         private static async Task DownloadWebFile(uint appId, string fileName, string url)
         {
             if (!CreateDirectories(appId, 0, out var installDir))

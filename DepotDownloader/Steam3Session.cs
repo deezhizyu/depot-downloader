@@ -140,45 +140,60 @@ namespace DepotDownloader
             }
         }
 
-        public async Task RequestAppInfo(uint appId, bool bForce = false)
+        public async Task RequestAppInfo(uint appId, bool bForce = false) => await RequestAppInfo([appId], bForce);
+
+        // Steam's own client batches PICS requests in chunks of a few hundred ids at a time.
+        const int PICSRequestChunkSize = 300;
+
+        public async Task RequestAppInfo(IEnumerable<uint> appIds, bool bForce = false)
         {
-            if ((AppInfo.ContainsKey(appId) && !bForce) || bAborted)
+            var ids = appIds.Distinct().Where(id => bForce || !AppInfo.ContainsKey(id)).ToList();
+
+            if (ids.Count == 0 || bAborted)
                 return;
 
-            var appTokens = await steamApps.PICSGetAccessTokens([appId], []);
-
-            if (appTokens.AppTokensDenied.Contains(appId))
+            foreach (var chunk in ids.Chunk(PICSRequestChunkSize))
             {
-                Console.WriteLine("Insufficient privileges to get access token for app {0}", appId);
-            }
+                var appTokens = await steamApps.PICSGetAccessTokens(chunk, []);
 
-            foreach (var token_dict in appTokens.AppTokens)
-            {
-                this.AppTokens[token_dict.Key] = token_dict.Value;
-            }
-
-            var request = new SteamApps.PICSRequest(appId);
-
-            if (AppTokens.TryGetValue(appId, out var token))
-            {
-                request.AccessToken = token;
-            }
-
-            var appInfoMultiple = await steamApps.PICSGetProductInfo([request], []);
-
-            foreach (var appInfo in appInfoMultiple.Results)
-            {
-                foreach (var app_value in appInfo.Apps)
+                foreach (var deniedAppId in appTokens.AppTokensDenied)
                 {
-                    var app = app_value.Value;
-
-                    Console.WriteLine("Got AppInfo for {0}", app.ID);
-                    AppInfo[app.ID] = app;
+                    Console.WriteLine("Insufficient privileges to get access token for app {0}", deniedAppId);
                 }
 
-                foreach (var app in appInfo.UnknownApps)
+                foreach (var token_dict in appTokens.AppTokens)
                 {
-                    AppInfo[app] = null;
+                    this.AppTokens[token_dict.Key] = token_dict.Value;
+                }
+
+                var requests = chunk.Select(id =>
+                {
+                    var request = new SteamApps.PICSRequest(id);
+
+                    if (AppTokens.TryGetValue(id, out var token))
+                    {
+                        request.AccessToken = token;
+                    }
+
+                    return request;
+                }).ToList();
+
+                var appInfoMultiple = await steamApps.PICSGetProductInfo(requests, []);
+
+                foreach (var appInfo in appInfoMultiple.Results)
+                {
+                    foreach (var app_value in appInfo.Apps)
+                    {
+                        var app = app_value.Value;
+
+                        Console.WriteLine("Got AppInfo for {0}", app.ID);
+                        AppInfo[app.ID] = app;
+                    }
+
+                    foreach (var app in appInfo.UnknownApps)
+                    {
+                        AppInfo[app] = null;
+                    }
                 }
             }
         }

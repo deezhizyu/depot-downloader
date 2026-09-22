@@ -205,6 +205,42 @@ namespace DepotDownloader
 
             #endregion
 
+            if (HasParameter(args, "-list-user-apps"))
+            {
+                #region List user apps
+
+                PrintUnconsumedArgs(args);
+
+                if (InitializeSteam(username, password))
+                {
+                    try
+                    {
+                        await ContentDownloader.ListUserAppsAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (
+                        ex is ContentDownloaderException
+                        || ex is OperationCanceledException)
+                    {
+                        Console.WriteLine(ex.Message);
+                        JsonOutput.Fail("unknown", ex.Message);
+                        return 1;
+                    }
+                    finally
+                    {
+                        ContentDownloader.ShutdownSteam3();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Error: InitializeSteam failed");
+                    return 1;
+                }
+
+                #endregion
+
+                return 0;
+            }
+
             var appId = GetParameter(args, "-app", ContentDownloader.INVALID_APP_ID);
             if (appId == ContentDownloader.INVALID_APP_ID)
             {
@@ -545,6 +581,9 @@ namespace DepotDownloader
             Console.WriteLine("Usage: downloading a workshop item using ugc id");
             Console.WriteLine("       depotdownloader -app <id> -ugc <id> [-username <username> [-password <password>]]");
             Console.WriteLine();
+            Console.WriteLine("Usage: listing apps available for download on an account");
+            Console.WriteLine("       depotdownloader -list-user-apps [-username <username> [-password <password>]]");
+            Console.WriteLine();
             Console.WriteLine("Parameters:");
             Console.WriteLine("  -app <#>                 - the AppID to download.");
             Console.WriteLine("  -depot <#>               - the DepotID to download.");
@@ -561,6 +600,8 @@ namespace DepotDownloader
             Console.WriteLine();
             Console.WriteLine("  -ugc <#>                 - the UGC ID to download.");
             Console.WriteLine("  -pubfile <#>             - the PublishedFileId to download. (Will automatically resolve to UGC id)");
+            Console.WriteLine();
+            Console.WriteLine("  -list-user-apps          - print the apps available for download on the logged-in account, then exit.");
             Console.WriteLine();
             Console.WriteLine("  -username <user>         - the username of the account to login to for restricted content.");
             Console.WriteLine("  -password <pass>         - the password of the account to login to for restricted content.");

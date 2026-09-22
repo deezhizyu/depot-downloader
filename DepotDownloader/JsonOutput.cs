@@ -142,6 +142,20 @@ namespace DepotDownloader
             w.WriteString("install_dir", installDir);
         });
 
+        public static void UserApps(IReadOnlyList<(uint AppId, string Name)> apps) => Emit("user_apps", w =>
+        {
+            w.WriteStartArray("apps");
+            foreach (var app in apps)
+            {
+                w.WriteStartObject();
+                w.WriteNumber("app_id", app.AppId);
+                w.WriteString("name", app.Name);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteNumber("count", apps.Count);
+        });
+
         public static void Plan(IReadOnlyList<PlanDepot> depots)
         {
             long compressed = 0, uncompressed = 0, files = 0;
